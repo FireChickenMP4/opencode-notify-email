@@ -12,8 +12,9 @@ Send opencode notifications by email, over SMTP.
 ## Requirements
 
 - [Bun](https://bun.sh) 1.3+
-- An SMTP account. For CCNU / Tencent Exmail use `smtp.exmail.qq.com:465` with a
-  **client-specific password** (Exmail: log in -> 设置 -> 客户端专用密码).
+- An SMTP account. Any provider works; set `host` / `port` / `secure` in the
+  config below. A **client-specific / app password** is recommended over the
+  account's main password.
 
 ## Install
 
