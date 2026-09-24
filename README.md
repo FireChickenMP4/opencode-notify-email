@@ -35,18 +35,20 @@ Create `~/.config/opencode/notify-email.json`:
 ```json
 {
   "smtp": {
-    "host": "smtp.exmail.qq.com",
+    "host": "smtp.example.com",
     "port": 465,
     "secure": true,
-    "user": "you@your.domain",
+    "user": "you@example.com",
     "pass": "client-specific-password",
-    "from": "opencode <you@your.domain>"
+    "from": "opencode <you@example.com>"
   },
   "to": "you@where-you-read-mail.com",
   "awayNotify": { "enabled": false }
 }
 ```
 
+- `host` / `port` / `secure`: use your provider's SMTP endpoint. `465` = implicit
+  TLS (`secure: true`); `587` = STARTTLS (`secure: false`).
 - `from` is optional; it defaults to `user`.
 - `to` may be one address or a list.
 
