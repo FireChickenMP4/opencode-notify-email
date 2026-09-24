@@ -27,18 +27,23 @@ New-Item -ItemType Directory -Force -Path $srcDir | Out-Null
 
 # All client sources travel with the plugin (a sibling dir, so opencode does not
 # treat their exports as plugins).
-$modules = @("config.ts", "mail.ts", "retry.ts", "transcript.ts", "client.ts", "notify.ts")
+$modules = @("config.ts", "mail.ts", "render.ts", "retry.ts", "transcript.ts", "client.ts", "notify.ts")
 foreach ($m in $modules) {
     Copy-Item (Join-Path $repo "src\$m") (Join-Path $srcDir $m) -Force
 }
 Copy-Item (Join-Path $repo "plugins\notify-email.ts") (Join-Path $pluginsDir "notify-email.ts") -Force
 Copy-Item (Join-Path $repo "src\notify-email.ps1") (Join-Path $srcDir "notify-email.ps1") -Force
 
-# nodemailer must be resolvable from the installed plugin; it is not bundled.
-if (-not (Test-Path (Join-Path $configDir "node_modules\nodemailer"))) {
-    Write-Output "installing nodemailer into the global config..."
-    $env:NODE_OPTIONS = "--use-system-ca"
-    & npm install nodemailer --prefix $configDir --no-audit --no-fund | Out-Null
+# Runtime deps must be resolvable from the installed plugin; they are not bundled.
+# Note: install one at a time. `npm install @missing` with an array splats each
+# element as a separate arg AND can split single-char names, installing junk.
+$deps = @("nodemailer", "marked")
+foreach ($dep in $deps) {
+    if (-not (Test-Path (Join-Path $configDir "node_modules\$dep"))) {
+        Write-Output "installing missing dep into the global config: $dep..."
+        $env:NODE_OPTIONS = "--use-system-ca"
+        & npm install $dep --prefix $configDir --no-audit --no-fund | Out-Null
+    }
 }
 
 # Shell function so `notify-email on|off|status|check` works anywhere.
