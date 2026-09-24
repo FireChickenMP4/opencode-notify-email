@@ -8,6 +8,7 @@
 import nodemailer from "nodemailer";
 
 import { loadConfig, recipients, resolvedSmtp, type SmtpConfig } from "./config";
+import { renderMarkdown, renderPlain, wrapDocument } from "./render";
 
 export type SendResult = { messageId?: string; accepted?: string[] };
 
@@ -40,14 +41,19 @@ function makeTransport(smtp: SmtpConfig): ReturnType<typeof nodemailer.createTra
  * Send an email.
  *
  * Reads SMTP settings and recipients fresh from the config, so a config edit
- * takes effect on the next message without a restart. Subject/body accept the
- * plain text; the body is sent as both text and HTML (a <pre> wrapper) so
- * markdown-ish output stays readable.
+ * takes effect on the next message without a restart.
+ *
+ * Body rendering:
+ *   - `html` (default): the body is treated as MARKDOWN and rendered to
+ *     inline-styled HTML (Gmail strips <style>, so styles are inline). Same
+ *     intent as the QQ channel's markdown push.
+ *   - `plain: true`: no markdown parse; wrap in <pre> so it stays verbatim.
+ * The text/plain alternative is always the raw body, for non-HTML clients.
  */
 export async function sendEmail(
   subject: string,
   body: string,
-  options: { html?: boolean } = {},
+  options: { plain?: boolean } = {},
 ): Promise<SendResult> {
   const cfg = loadConfig();
   const smtp = resolvedSmtp(cfg);
@@ -63,6 +69,9 @@ export async function sendEmail(
   const raw = smtp.from ?? smtp.user;
   // Accept both `Name <addr>` and a bare address.
   const from = raw.includes("<") ? raw : `${raw} <${raw}>`;
+  // A bare "<pre>" wrap needs the container too, so inline code spans inside a
+  // plain body still render on one line.
+  const html = wrapDocument(options.plain ? renderPlain(body) : renderMarkdown(body));
 
   try {
     const info = await makeTransport(smtp).sendMail({
@@ -70,19 +79,13 @@ export async function sendEmail(
       to: to.join(", "),
       subject,
       text: body,
-      // Wrap plain text in <pre> so indentation/newlines survive, unless the
-      // caller already supplied HTML.
-      html: options.html ? body : `<pre style="font:13px/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap">${escapeHtml(body)}</pre>`,
+      html,
     });
     return { messageId: info.messageId, accepted: info.accepted as string[] };
   } catch (cause) {
     const e = cause as { message?: string; code?: string };
     throw new EmailError(e.message ?? String(cause), e.code);
   }
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 /** Drop the cached transport (after a config change, or in tests). */

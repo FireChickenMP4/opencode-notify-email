@@ -2,19 +2,12 @@
 
 Send opencode notifications by email, over SMTP.
 
-## Why
-
-The [QQ channel](https://github.com/FireChickenMP4/opencode-notify-qq) is great for
-when you are away, but on the desktop it doubles up with the Windows toast - two
-pings for one event. Email is the quiet, archivable channel: it lands in an inbox
-you can search later, and most mail clients do not raise it like a chat message.
-
 ## What it does / does not
 
 - Sends an email when a turn finishes (if the away switch is ON).
 - Exposes a `notify_email` tool so the agent can email you on purpose.
-- Does **not** receive replies or act on them (the QQ project handles remote
-  approval; email is one-way by design).
+- Does **not** receive replies or act on them: email is one-way by design.
+  Remote approval lives in the [QQ project](https://github.com/FireChickenMP4/opencode-notify-qq).
 
 ## Requirements
 

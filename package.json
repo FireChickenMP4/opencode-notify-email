@@ -10,6 +10,7 @@
     "test": "bun test"
   },
   "dependencies": {
+    "marked": "^18.0.14",
     "nodemailer": "^7.0.9"
   },
   "devDependencies": {
