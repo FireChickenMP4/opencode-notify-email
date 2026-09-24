@@ -1,0 +1,13 @@
+node_modules/
+bun.lock
+package-lock.json
+
+# runtime state
+notify-email.events.log
+notify-email.undelivered.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
