@@ -11,8 +11,26 @@
 export type TranscriptClient = {
   session: {
     messages(input: { path: { id: string } }): Promise<{ data?: MessageList }>;
+    get(input: { path: { id: string } }): Promise<{ data?: { parentID?: string; title?: string } }>;
   };
 };
+
+/**
+ * True when the session is a subagent (has a parentID).
+ *
+ * A subagent finishing emits the SAME `session.status idle` as a main session,
+ * but the main one is still working - emailing "done" then is misleading and
+ * noisy. Fails open (treats unknown as main) so a lookup error never suppresses
+ * a real completion notice.
+ */
+export async function isSubagent(client: TranscriptClient, sessionID: string): Promise<boolean> {
+  try {
+    const res = await client.session.get({ path: { id: sessionID } });
+    return Boolean(res.data?.parentID);
+  } catch {
+    return false;
+  }
+}
 
 export type MessageList = Array<{
   info?: { role?: string };

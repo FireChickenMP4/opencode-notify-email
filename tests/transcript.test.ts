@@ -4,7 +4,7 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { pickFinalText, type MessageList } from "../src/transcript";
+import { pickFinalText, isSubagent, type MessageList, type TranscriptClient } from "../src/transcript";
 
 const A = (parts: Array<{ type: string; text?: string }>) => ({ info: { role: "assistant" }, parts });
 const U = (text: string) => ({ info: { role: "user" }, parts: [{ type: "text", text }] });
@@ -44,5 +44,20 @@ describe("pickFinalText", () => {
 
   test("empty input yields empty", () => {
     expect(pickFinalText([])).toBe("");
+  });
+});
+
+describe("isSubagent", () => {
+  const fake = (data: unknown, throws = false): TranscriptClient =>
+    ({ session: { get: async () => { if (throws) throw new Error("x"); return { data }; } } }) as unknown as TranscriptClient;
+
+  test("true when parentID is set", async () => {
+    expect(await isSubagent(fake({ parentID: "ses_p" }), "s")).toBe(true);
+  });
+  test("false for a main session", async () => {
+    expect(await isSubagent(fake({}), "s")).toBe(false);
+  });
+  test("fails open (false) on error, so a real notice is not dropped", async () => {
+    expect(await isSubagent(fake(null, true), "s")).toBe(false);
   });
 });

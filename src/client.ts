@@ -9,7 +9,7 @@
 import { loadConfig, awayEnabled, configPath, recipients, resolvedSmtp, setAwayNotify } from "./config";
 import { sendEmail, resetTransport } from "./mail";
 import { sendWithRetry } from "./retry";
-import { lastAssistantText } from "./transcript";
+import { lastAssistantText, isSubagent } from "./transcript";
 
 export {
   loadConfig,
@@ -22,4 +22,5 @@ export {
   resetTransport,
   sendWithRetry,
   lastAssistantText,
+  isSubagent,
 };

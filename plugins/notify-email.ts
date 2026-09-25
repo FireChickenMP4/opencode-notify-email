@@ -88,6 +88,8 @@ export const NotifyEmailPlugin: Plugin = async ({ client: oc }) => {
       const props = (event as { properties?: { sessionID?: string; status?: { type?: string } } }).properties;
       if (props?.status?.type !== "idle") return;
       if (!client.awayEnabled()) return;
+      // A subagent finishing is not "done": the main session is still working.
+      if (props.sessionID && (await client.isSubagent(oc, props.sessionID))) return;
       if (!shouldSend("idle")) return;
 
       const summary = props.sessionID ? await client.lastAssistantText(oc, props.sessionID) : "";
