@@ -7,6 +7,8 @@
 
 /** Fields the permission branch reads off a V2 `permission.asked` event. */
 export type PermissionData = {
+  // The request id, used to tell a still-waiting request from an auto-accepted one.
+  id?: string;
   // The permission/tool kind (V1 called this `permission`), e.g. "bash", "edit".
   action?: string;
   // The resources the request covers (V1 called these `patterns`).

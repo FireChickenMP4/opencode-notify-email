@@ -17,7 +17,8 @@
  */
 
 import type { Plugin } from "@opencode/plugin";
-import { appendFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { NotifyEvent } from "../src/events";
@@ -46,6 +47,45 @@ function trace(line: string): void {
     appendFileSync(join(HERE, "notify-email.events.log"), `${new Date().toISOString()} ${line}\n`, "utf8");
   } catch {
     /* diagnostics must never break anything */
+  }
+}
+
+/**
+ * De-duplicate notifications of the same kind within a short window.
+ *
+ * The window is claimed through the filesystem rather than an in-memory map:
+ * opencode loads a local plugin more than once, and the instances do not share
+ * module state, so a counter would let each one send the same event.
+ */
+const DEDUP_MS = Number(process.env.OPENCODE_NOTIFY_EMAIL_DEDUP_MS ?? 5000);
+const DEDUP_DIR = join(tmpdir(), "opencode-notify", "notify-email");
+
+/** Only mail about a permission that is still unanswered after this long. */
+const PERMISSION_GRACE_MS = Number(process.env.OPENCODE_NOTIFY_EMAIL_PERMISSION_GRACE_MS ?? 1500);
+
+function shouldSend(kind: string): boolean {
+  const claim = join(DEDUP_DIR, kind);
+  try {
+    mkdirSync(DEDUP_DIR, { recursive: true });
+    // An exclusive create succeeds for exactly one instance per window.
+    mkdirSync(claim);
+    return true;
+  } catch (cause) {
+    if ((cause as NodeJS.ErrnoException)?.code !== "EEXIST") {
+      // Cannot claim at all: fail open, a notification matters more than noise.
+      return true;
+    }
+    try {
+      // A winner that never came back (crash) must not block the kind forever.
+      if (Date.now() - statSync(claim).mtimeMs >= DEDUP_MS) {
+        rmSync(claim, { recursive: true, force: true });
+        return shouldSend(kind);
+      }
+    } catch {
+      /* the claim vanished between the two calls */
+    }
+    trace(`dedup: suppressed duplicate ${kind} (within ${DEDUP_MS}ms)`);
+    return false;
   }
 }
 
@@ -81,13 +121,24 @@ async function setup(ctx: Plugin.Context): Promise<() => void> {
     return `failed after ${sent.attempts} attempts: ${sent.error}`;
   }
 
-  const DEDUP_MS = Number(process.env.OPENCODE_NOTIFY_EMAIL_DEDUP_MS ?? 5000);
-  const lastSent = new Map<string, number>();
-  function shouldSend(kind: string): boolean {
-    const now = Date.now();
-    if (now - (lastSent.get(kind) ?? 0) < DEDUP_MS) return false;
-    lastSent.set(kind, now);
-    return true;
+  /**
+   * True when a permission request is still unanswered after a short grace.
+   *
+   * opencode can accept a request automatically, which resolves it almost
+   * immediately; a mail for that is pure noise. Fails open: a lookup error
+   * counts as "still waiting", so a real notice is never lost.
+   */
+  async function stillWaiting(data: NotifyEvent["data"]): Promise<boolean> {
+    const sessionID = data?.sessionID;
+    const requestID = data?.id;
+    if (!sessionID || !requestID) return true;
+    await new Promise((r) => setTimeout(r, PERMISSION_GRACE_MS));
+    try {
+      const pending = await ctx.permission.list({ sessionID });
+      return pending.some((p) => p.id === requestID);
+    } catch {
+      return true;
+    }
   }
 
   /** Handle one V2 event; V2 carries every payload under `data`. */
@@ -95,6 +146,12 @@ async function setup(ctx: Plugin.Context): Promise<() => void> {
     // A permission request blocks the agent; notify the user so they can come
     // back. Checked before the idle gate, which only matches session.status.
     if (event.type === "permission.asked") {
+      // An auto-accepted request is answered within milliseconds; only a
+      // request that is genuinely waiting for you deserves a mail.
+      if (!(await stillWaiting(event.data))) {
+        trace("permission skipped: already resolved");
+        return;
+      }
       const notice = client.permissionNotice(event, client.awayEnabled(), workspace);
       if (!notice) {
         trace("permission skipped: awayNotify is off");
