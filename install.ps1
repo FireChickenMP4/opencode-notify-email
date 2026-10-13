@@ -27,7 +27,7 @@ New-Item -ItemType Directory -Force -Path $srcDir | Out-Null
 
 # All client sources travel with the plugin (a sibling dir, so opencode does not
 # treat their exports as plugins).
-$modules = @("config.ts", "mail.ts", "render.ts", "retry.ts", "transcript.ts", "client.ts", "notify.ts")
+$modules = @("config.ts", "mail.ts", "render.ts", "retry.ts", "transcript.ts", "events.ts", "client.ts", "notify.ts")
 foreach ($m in $modules) {
     Copy-Item (Join-Path $repo "src\$m") (Join-Path $srcDir $m) -Force
 }

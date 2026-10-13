@@ -10,6 +10,7 @@ import { loadConfig, awayEnabled, configPath, recipients, resolvedSmtp, setAwayN
 import { sendEmail, resetTransport } from "./mail";
 import { sendWithRetry } from "./retry";
 import { lastAssistantText, isSubagent } from "./transcript";
+import { permissionNotice } from "./events";
 
 export {
   loadConfig,
@@ -23,4 +24,5 @@ export {
   sendWithRetry,
   lastAssistantText,
   isSubagent,
+  permissionNotice,
 };

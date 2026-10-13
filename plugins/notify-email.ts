@@ -1,9 +1,11 @@
 /**
- * Email notifications for opencode. Two paths, same shape as the QQ plugin:
+ * Email notifications for opencode. Automatic paths, same shape as the QQ plugin:
  *
  *   1. `notify_email` tool - the agent decides to send (long task done, a
  *      decision is needed, user stepped out).
  *   2. Idle auto-push - when a turn finishes AND the switch is ON.
+ *   3. Permission auto-push - when the agent is blocked on a permission
+ *      request AND the switch is ON.
  *
  * Why email alongside QQ: QQ is the phone/remote channel; on the desktop it
  * doubles up with the Windows toast. Email is the quiet, archivable channel.
@@ -18,6 +20,7 @@ import { tool, type Plugin } from "@opencode-ai/plugin";
 import { appendFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { NotifyEvent } from "../src/events";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -48,10 +51,18 @@ function trace(line: string): void {
   }
 }
 
-export const NotifyEmailPlugin: Plugin = async ({ client: oc }) => {
+export const NotifyEmailPlugin: Plugin = async ({ client: oc, directory }) => {
   await oc.app
     .log({ body: { service: "notify-email", level: "info", message: "notify_email tool registered" } })
     .catch(() => {});
+
+  /** Full workspace path, home abbreviated to `~` (same as the QQ plugin). */
+  const workspace = (() => {
+    const dir = directory || process.cwd();
+    const home = process.env.USERPROFILE || process.env.HOME || "";
+    const short = home && dir.toLowerCase().startsWith(home.toLowerCase()) ? `~${dir.slice(home.length)}` : dir;
+    return short.replace(/\\/g, "/");
+  })();
 
   /** Send with a couple of retries; a lost notification is the thing we prevent. */
   async function trySend(subject: string, body: string): Promise<string> {
@@ -84,6 +95,25 @@ export const NotifyEmailPlugin: Plugin = async ({ client: oc }) => {
 
   return {
     event: async ({ event }) => {
+      // A permission request blocks the agent; notify the user so they can come
+      // back. Checked before the idle gate, which only matches session.status.
+      // The cast is needed because the SDK's Event union lists
+      // "permission.updated" but not the "permission.asked" the server emits.
+      const permissionEvent = event as NotifyEvent;
+      if (permissionEvent.type === "permission.asked") {
+        const notice = client.permissionNotice(permissionEvent, client.awayEnabled(), workspace);
+        if (!notice) {
+          trace("permission skipped: awayNotify is off");
+          return;
+        }
+        if (!shouldSend("permission")) {
+          trace("permission skipped: dedup");
+          return;
+        }
+        await trySend(notice.subject, notice.body);
+        return;
+      }
+
       if (event.type !== "session.status") return;
       const props = (event as { properties?: { sessionID?: string; status?: { type?: string } } }).properties;
       if (props?.status?.type !== "idle") return;
