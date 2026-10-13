@@ -6,8 +6,8 @@ import { describe, expect, test } from "bun:test";
 
 import { pickFinalText, isSubagent, type MessageList, type TranscriptClient } from "../src/transcript";
 
-const A = (parts: Array<{ type: string; text?: string }>) => ({ info: { role: "assistant" }, parts });
-const U = (text: string) => ({ info: { role: "user" }, parts: [{ type: "text", text }] });
+const A = (content: Array<{ type: string; text?: string }>) => ({ type: "assistant", content });
+const U = (text: string) => ({ type: "user", text });
 
 describe("pickFinalText", () => {
   test("takes the last text-only assistant message", () => {
@@ -33,6 +33,16 @@ describe("pickFinalText", () => {
     expect(pickFinalText(msgs)).toBe("the previous answer");
   });
 
+  test("skips a trailing turn-end marker too (V2 appends its own message kinds)", () => {
+    const msgs: MessageList = [
+      U("go"),
+      A([{ type: "text", text: "the answer" }]),
+      U(".task do the next thing"),
+      { type: "idle" },
+    ];
+    expect(pickFinalText(msgs)).toBe("the answer");
+  });
+
   test("stops at the turn boundary", () => {
     const msgs: MessageList = [A([{ type: "text", text: "old" }]), U("new turn"), A([{ type: "tool" }])];
     expect(pickFinalText(msgs)).toBe("");
@@ -48,8 +58,8 @@ describe("pickFinalText", () => {
 });
 
 describe("isSubagent", () => {
-  const fake = (data: unknown, throws = false): TranscriptClient =>
-    ({ session: { get: async () => { if (throws) throw new Error("x"); return { data }; } } }) as unknown as TranscriptClient;
+  const fake = (session: unknown, throws = false): TranscriptClient =>
+    ({ session: { get: async () => { if (throws) throw new Error("x"); return session; } } }) as unknown as TranscriptClient;
 
   test("true when parentID is set", async () => {
     expect(await isSubagent(fake({ parentID: "ses_p" }), "s")).toBe(true);
