@@ -202,10 +202,14 @@ async function setup(ctx: Plugin.Context): Promise<() => void> {
       return;
     }
 
-    if (event.type !== "session.status") return;
-    if (event.data?.status?.type !== "idle") return;
+    // V2 has no session.idle or session.status event on the public stream, so
+    // the turn boundary is the step that ends without wanting a tool call:
+    // `finish: "tool-calls"` means the turn continues.
+    if (event.type !== "session.step.ended") return;
+    if (event.data?.finish === "tool-calls") return;
     if (!client.awayEnabled()) return;
-    const sessionID = event.data.sessionID;
+
+    const sessionID = event.data?.sessionID;
     // A subagent finishing is not "done": the main session is still working.
     if (sessionID && (await client.isSubagent(ctx, sessionID))) return;
     if (!shouldSend("idle")) return;

@@ -22,7 +22,11 @@ export type NotifyEvent = {
   /** The location the event was published for; the session's own directory. */
   location?: { directory?: string };
   // V2 carries the payload under `data`; V1 used `properties`.
-  data?: PermissionData & { status?: { type?: string } };
+  data?: PermissionData & {
+    status?: { type?: string };
+    /** Why a step ended; anything but "tool-calls" means the turn is over. */
+    finish?: string;
+  };
 };
 
 export type Notice = { subject: string; body: string };
