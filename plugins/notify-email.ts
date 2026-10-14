@@ -189,7 +189,12 @@ async function setup(ctx: Plugin.Context): Promise<() => void> {
         trace("permission skipped: already resolved");
         return;
       }
-      // Needs an answer, so the away switch does not gate it.
+      // The TUI shows the request while you are at the computer; the away switch
+      // is what says you are not, so it gates this mail.
+      if (!client.awayEnabled()) {
+        trace("permission skipped: awayNotify is off");
+        return;
+      }
       const notice = client.permissionNotice(event, workspaceOf(event));
       if (!notice) return;
       if (!shouldSend("permission")) {
@@ -201,9 +206,13 @@ async function setup(ctx: Plugin.Context): Promise<() => void> {
     }
 
     // The agent asked a question (the `question` tool) and is blocked until it is
-    // answered; V2 surfaces that as `form.created`. Like a permission request it
-    // needs an answer, so the away switch does not gate it.
+    // answered; V2 surfaces that as `form.created`. Same rule as a permission:
+    // mailed only while you are away, since the TUI asks while you are there.
     if (event.type === "form.created") {
+      if (!client.awayEnabled()) {
+        trace("form skipped: awayNotify is off");
+        return;
+      }
       const notice = client.formNotice(event, workspaceOf(event));
       if (!notice) return;
       if (!shouldSend("form")) {
