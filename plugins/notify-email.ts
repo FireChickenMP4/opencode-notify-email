@@ -189,11 +189,9 @@ async function setup(ctx: Plugin.Context): Promise<() => void> {
         trace("permission skipped: already resolved");
         return;
       }
-      const notice = client.permissionNotice(event, client.awayEnabled(), workspaceOf(event));
-      if (!notice) {
-        trace("permission skipped: awayNotify is off");
-        return;
-      }
+      // Needs an answer, so the away switch does not gate it.
+      const notice = client.permissionNotice(event, workspaceOf(event));
+      if (!notice) return;
       if (!shouldSend("permission")) {
         trace("permission skipped: dedup");
         return;
@@ -202,14 +200,12 @@ async function setup(ctx: Plugin.Context): Promise<() => void> {
       return;
     }
 
-    // The agent asked a question (the `question` tool) and is blocked until it
-    // is answered; V2 surfaces that as `form.created`.
+    // The agent asked a question (the `question` tool) and is blocked until it is
+    // answered; V2 surfaces that as `form.created`. Like a permission request it
+    // needs an answer, so the away switch does not gate it.
     if (event.type === "form.created") {
-      const notice = client.formNotice(event, client.awayEnabled(), workspaceOf(event));
-      if (!notice) {
-        trace("form skipped: awayNotify is off");
-        return;
-      }
+      const notice = client.formNotice(event, workspaceOf(event));
+      if (!notice) return;
       if (!shouldSend("form")) {
         trace("form skipped: dedup");
         return;

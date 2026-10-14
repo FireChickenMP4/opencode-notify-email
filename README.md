@@ -6,7 +6,8 @@ Send opencode notifications by email, over SMTP.
 
 - Sends an email when a turn finishes (if the away switch is ON).
 - Sends an email when the agent is blocked on a permission request, or is waiting
-  for an answer to a question (`question` tool) - both gated on the away switch.
+  for an answer to a question (`question` tool). Both need an answer, so they are
+  **not** gated on the away switch.
 - Exposes a `notify_email` tool so the agent can email you on purpose.
 - Does **not** receive replies or act on them: email is one-way by design.
   Remote approval lives in the [QQ project](https://github.com/FireChickenMP4/opencode-notify-qq).

@@ -31,7 +31,6 @@ describe("formNotice", () => {
           },
         },
       },
-      true,
       "D:/Desktop",
     );
     expect(notice?.subject).toBe("opencode · 需要你回答 [D:/Desktop]");
@@ -41,12 +40,12 @@ describe("formNotice", () => {
     expect(notice?.body).toContain("邮件不支持回答问题");
   });
 
-  test("returns null when the away switch is off", () => {
-    expect(formNotice({ type: "form.created", data: { form: { fields: [] } } }, false, "x")).toBeNull();
+  test("only handles form events", () => {
+    expect(formNotice({ type: "permission.asked" }, "x")).toBeNull();
   });
 
   test("returns null for an unrelated event", () => {
-    expect(formNotice({ type: "session.step.ended" }, true, "x")).toBeNull();
+    expect(formNotice({ type: "session.step.ended" }, "x")).toBeNull();
   });
 });
 
@@ -57,7 +56,6 @@ describe("permissionNotice", () => {
         type: "permission.asked",
         data: { id: "p1", action: "external_directory", resources: ["C:/Users/1/perm/*"] },
       },
-      true,
       "D:/Desktop",
     );
     expect(notice?.subject).toBe("opencode · 需要授权 [D:/Desktop]");

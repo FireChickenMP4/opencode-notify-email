@@ -37,16 +37,15 @@ export type Notice = { subject: string; body: string };
  * The email for a permission request, or null when none applies.
  *
  * A permission request means the agent is BLOCKED and cannot proceed without
- * the user, so it is notified even though it is not "completion". Unlike an
- * idle signal, a subagent's request still notifies: the main session is blocked
- * while it waits. Gated on the away switch, same as the completion push.
+ * the user, so it is notified even though it is not "completion" - and the away
+ * switch does not gate it: a request that needs an answer is a reply, not an
+ * unsolicited push.
  *
  * Content follows the QQ notice (workspace, kind, command/scope), except the
  * reply line: email is one-way, so it says approval must happen in opencode.
  */
-export function permissionNotice(event: NotifyEvent, away: boolean, workspace: string): Notice | null {
+export function permissionNotice(event: NotifyEvent, workspace: string): Notice | null {
   if (event.type !== "permission.asked") return null;
-  if (!away) return null;
   const p = event.data ?? {};
   const kind = typeof p.action === "string" ? p.action : "unknown";
   const patterns = Array.isArray(p.resources) ? p.resources.map(String) : [];
@@ -110,11 +109,11 @@ export type FormData = {
  * The email for a form the agent is waiting on, or null when none applies.
  *
  * A form means the agent asked something and cannot proceed without an answer
- * (`question` tool). Gated on the away switch, same as the other pushes.
+ * (`question` tool), so like a permission request it is not gated on the away
+ * switch.
  */
-export function formNotice(event: NotifyEvent, away: boolean, workspace: string): Notice | null {
+export function formNotice(event: NotifyEvent, workspace: string): Notice | null {
   if (event.type !== "form.created") return null;
-  if (!away) return null;
   const form = event.data?.form;
   if (!form) return null;
   return {
