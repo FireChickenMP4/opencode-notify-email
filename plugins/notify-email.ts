@@ -17,8 +17,8 @@
  */
 
 import type { Plugin } from "@opencode/plugin";
-import { appendFileSync, mkdirSync, rmSync, statSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { appendFileSync, mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { NotifyEvent } from "../src/events";
@@ -47,6 +47,33 @@ function trace(line: string): void {
     appendFileSync(join(HERE, "notify-email.events.log"), `${new Date().toISOString()} ${line}\n`, "utf8");
   } catch {
     /* diagnostics must never break anything */
+  }
+}
+
+/**
+ * Path of the CLI settings file, where automatic approval of permission
+ * requests is configured.
+ */
+function cliConfigPath(): string {
+  const base = process.env.XDG_CONFIG_HOME || join(homedir(), ".config");
+  return join(base, "opencode", "cli.json");
+}
+
+/**
+ * True when the CLI answers permission requests on its own.
+ *
+ * Only then can a request be resolved before a human ever sees it, which is the
+ * one case where a mail about it would be noise. Read fresh, so flipping the
+ * setting takes effect without a restart.
+ */
+function autoAcceptEnabled(): boolean {
+  try {
+    const cfg = JSON.parse(readFileSync(cliConfigPath(), "utf8")) as { session?: { permissions?: unknown } };
+    const mode = cfg.session?.permissions;
+    return typeof mode === "string" && mode.toLowerCase().replace(/[-_]/g, "") === "autoaccept";
+  } catch {
+    // Unreadable settings: assume requests are answered by hand, so mail at once.
+    return false;
   }
 }
 
@@ -93,13 +120,21 @@ function shouldSend(kind: string): boolean {
 async function setup(ctx: Plugin.Context): Promise<() => void> {
   console.log("[notify-email] notify_email tool registered");
 
-  /** Full workspace path, home abbreviated to `~` (same as the QQ plugin). */
-  const workspace = (() => {
-    const dir = ctx.location.directory || process.cwd();
+  /**
+   * Full workspace path for a label, home abbreviated to `~` (same as the QQ
+   * plugin).
+   *
+   * The directory comes from the event, never from this plugin instance:
+   * opencode loads a local plugin once per location, so the instance's own
+   * directory belongs to whichever location loaded it, not to the session that
+   * fired the event.
+   */
+  function workspaceOf(event: NotifyEvent): string {
+    const dir = event.location?.directory ?? ctx.location.directory ?? process.cwd();
     const home = process.env.USERPROFILE || process.env.HOME || "";
     const short = home && dir.toLowerCase().startsWith(home.toLowerCase()) ? `~${dir.slice(home.length)}` : dir;
     return short.replace(/\\/g, "/");
-  })();
+  }
 
   /** Send with a couple of retries; a lost notification is the thing we prevent. */
   async function trySend(subject: string, body: string): Promise<string> {
@@ -124,14 +159,16 @@ async function setup(ctx: Plugin.Context): Promise<() => void> {
   /**
    * True when a permission request is still unanswered after a short grace.
    *
-   * opencode can accept a request automatically, which resolves it almost
-   * immediately; a mail for that is pure noise. Fails open: a lookup error
-   * counts as "still waiting", so a real notice is never lost.
+   * Only auto-accept can resolve a request before a human sees it, so with
+   * manual approval there is nothing to wait for and the mail goes out at once.
+   * Fails open: a lookup error counts as "still waiting", so a real notice is
+   * never lost.
    */
   async function stillWaiting(data: NotifyEvent["data"]): Promise<boolean> {
     const sessionID = data?.sessionID;
     const requestID = data?.id;
     if (!sessionID || !requestID) return true;
+    if (!autoAcceptEnabled()) return true;
     await new Promise((r) => setTimeout(r, PERMISSION_GRACE_MS));
     try {
       const pending = await ctx.permission.list({ sessionID });
@@ -152,7 +189,7 @@ async function setup(ctx: Plugin.Context): Promise<() => void> {
         trace("permission skipped: already resolved");
         return;
       }
-      const notice = client.permissionNotice(event, client.awayEnabled(), workspace);
+      const notice = client.permissionNotice(event, client.awayEnabled(), workspaceOf(event));
       if (!notice) {
         trace("permission skipped: awayNotify is off");
         return;

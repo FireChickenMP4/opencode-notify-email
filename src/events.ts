@@ -19,6 +19,8 @@ export type PermissionData = {
 
 export type NotifyEvent = {
   type?: string;
+  /** The location the event was published for; the session's own directory. */
+  location?: { directory?: string };
   // V2 carries the payload under `data`; V1 used `properties`.
   data?: PermissionData & { status?: { type?: string } };
 };
