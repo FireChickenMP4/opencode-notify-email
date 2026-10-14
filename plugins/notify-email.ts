@@ -222,8 +222,10 @@ async function setup(ctx: Plugin.Context): Promise<() => void> {
     if (!client.awayEnabled()) return;
 
     const sessionID = event.data?.sessionID;
-    // A subagent finishing is not "done": the main session is still working.
-    if (sessionID && (await client.isSubagent(ctx, sessionID))) return;
+    // A subagent finishing, or a `.bt` aside fork, is not "done" for the user:
+    // the first is still part of the running turn, the second is relayed by the
+    // QQ bridge itself.
+    if (sessionID && (await client.isQuietSession(ctx, sessionID))) return;
     if (!shouldSend("idle")) return;
 
     const summary = sessionID ? await client.lastAssistantText(ctx, sessionID) : "";

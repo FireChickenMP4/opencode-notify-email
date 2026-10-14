@@ -16,7 +16,7 @@
  */
 export type TranscriptClient = {
   session: {
-    get(input: { sessionID: string }): Promise<{ parentID?: string }>;
+    get(input: { sessionID: string }): Promise<{ parentID?: string; title?: string; metadata?: { aside?: boolean } }>;
     context(input: { sessionID: string }): Promise<MessageList>;
   };
 };
@@ -33,17 +33,25 @@ export type SessionMessage = {
 export type MessageList = readonly SessionMessage[];
 
 /**
- * True when the session is a subagent (has a parentID).
+ * True when this session's completion should stay quiet.
  *
- * A subagent finishing emits the SAME `session.status idle` as a main session,
- * but the main one is still working - emailing "done" then is misleading and
- * noisy. Fails open (treats unknown as main) so a lookup error never suppresses
- * a real completion notice.
+ * Two cases:
+ *   - a subagent (has a parentID): it finishes while the main session is still
+ *     working, so "done" would be misleading and noisy;
+ *   - a `.bt` aside fork (no parentID, marked by the QQ bridge): the bridge
+ *     relays that answer itself, so a second notice is pure noise.
+ *
+ * Fails open (treats unknown as main) so a lookup error never suppresses a real
+ * completion notice.
  */
-export async function isSubagent(client: TranscriptClient, sessionID: string): Promise<boolean> {
+export async function isQuietSession(client: TranscriptClient, sessionID: string): Promise<boolean> {
   try {
     const session = await client.session.get({ sessionID });
-    return Boolean(session.parentID);
+    return (
+      Boolean(session.parentID) ||
+      session.metadata?.aside === true ||
+      Boolean(session.title?.startsWith("旁问 ·"))
+    );
   } catch {
     return false;
   }

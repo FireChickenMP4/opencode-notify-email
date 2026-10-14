@@ -4,7 +4,7 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { pickFinalText, isSubagent, type MessageList, type TranscriptClient } from "../src/transcript";
+import { pickFinalText, isQuietSession, type MessageList, type TranscriptClient } from "../src/transcript";
 
 const A = (content: Array<{ type: string; text?: string }>) => ({ type: "assistant", content });
 const U = (text: string) => ({ type: "user", text });
@@ -57,17 +57,21 @@ describe("pickFinalText", () => {
   });
 });
 
-describe("isSubagent", () => {
+describe("isQuietSession", () => {
   const fake = (session: unknown, throws = false): TranscriptClient =>
     ({ session: { get: async () => { if (throws) throw new Error("x"); return session; } } }) as unknown as TranscriptClient;
 
   test("true when parentID is set", async () => {
-    expect(await isSubagent(fake({ parentID: "ses_p" }), "s")).toBe(true);
+    expect(await isQuietSession(fake({ parentID: "ses_p" }), "s")).toBe(true);
+  });
+  test("true for a .bt aside fork, marked or titled", async () => {
+    expect(await isQuietSession(fake({ metadata: { aside: true } }), "s")).toBe(true);
+    expect(await isQuietSession(fake({ title: "旁问 · 为什么构建挂了" }), "s")).toBe(true);
   });
   test("false for a main session", async () => {
-    expect(await isSubagent(fake({}), "s")).toBe(false);
+    expect(await isQuietSession(fake({}), "s")).toBe(false);
   });
   test("fails open (false) on error, so a real notice is not dropped", async () => {
-    expect(await isSubagent(fake(null, true), "s")).toBe(false);
+    expect(await isQuietSession(fake(null, true), "s")).toBe(false);
   });
 });
