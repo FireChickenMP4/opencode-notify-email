@@ -202,6 +202,22 @@ async function setup(ctx: Plugin.Context): Promise<() => void> {
       return;
     }
 
+    // The agent asked a question (the `question` tool) and is blocked until it
+    // is answered; V2 surfaces that as `form.created`.
+    if (event.type === "form.created") {
+      const notice = client.formNotice(event, client.awayEnabled(), workspaceOf(event));
+      if (!notice) {
+        trace("form skipped: awayNotify is off");
+        return;
+      }
+      if (!shouldSend("form")) {
+        trace("form skipped: dedup");
+        return;
+      }
+      await trySend(notice.subject, notice.body);
+      return;
+    }
+
     // V2 has no session.idle or session.status event on the public stream, so
     // the turn boundary is the step that ends without wanting a tool call:
     // `finish: "tool-calls"` means the turn continues.

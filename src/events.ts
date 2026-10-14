@@ -26,6 +26,8 @@ export type NotifyEvent = {
     status?: { type?: string };
     /** Why a step ended; anything but "tool-calls" means the turn is over. */
     finish?: string;
+    /** Present on `form.created`: what the agent is waiting to be answered. */
+    form?: FormData;
   };
 };
 
@@ -86,5 +88,60 @@ function permissionBody(
   }
 
   lines.push("", "邮件不支持远程审批，请回到 opencode 处理。");
+  return lines.join("\n");
+}
+
+/** The form payload of a V2 `form.created` event (the `question` tool uses this). */
+export type FormData = {
+  id?: string;
+  sessionID?: string;
+  title?: string;
+  fields?: Array<{
+    key?: string;
+    type?: string;
+    title?: string;
+    description?: string;
+    required?: boolean;
+    options?: Array<{ value?: string; label?: string; description?: string }>;
+  }>;
+};
+
+/**
+ * The email for a form the agent is waiting on, or null when none applies.
+ *
+ * A form means the agent asked something and cannot proceed without an answer
+ * (`question` tool). Gated on the away switch, same as the other pushes.
+ */
+export function formNotice(event: NotifyEvent, away: boolean, workspace: string): Notice | null {
+  if (event.type !== "form.created") return null;
+  if (!away) return null;
+  const form = event.data?.form;
+  if (!form) return null;
+  return {
+    subject: `opencode · 需要你回答 [${workspace}]`,
+    body: formBody(workspace, form),
+  };
+}
+
+/** Layout: workspace, then every field with its options, then the one-way note. */
+function formBody(workspace: string, form: FormData): string {
+  const lines = [`目录: \`${workspace}\``];
+  if (form.title) lines.push(`标题: **${form.title}**`);
+
+  const fields = Array.isArray(form.fields) ? form.fields : [];
+  for (const f of fields) {
+    const label = (typeof f.title === "string" && f.title) || (typeof f.key === "string" && f.key) || "(未命名)";
+    lines.push("", `**${label}**${f.required ? "（必填）" : ""}`);
+    if (typeof f.description === "string" && f.description) lines.push(f.description);
+    const options = Array.isArray(f.options) ? f.options : [];
+    for (const o of options) {
+      const text = (typeof o.label === "string" && o.label) || (typeof o.value === "string" && o.value) || "";
+      const desc = typeof o.description === "string" && o.description ? ` — ${o.description}` : "";
+      lines.push(`- ${text}${desc}`);
+    }
+  }
+  if (fields.length === 0) lines.push("", "(没有问题字段)");
+
+  lines.push("", "邮件不支持回答问题，请回到 opencode 处理。");
   return lines.join("\n");
 }

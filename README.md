@@ -5,6 +5,8 @@ Send opencode notifications by email, over SMTP.
 ## What it does / does not
 
 - Sends an email when a turn finishes (if the away switch is ON).
+- Sends an email when the agent is blocked on a permission request, or is waiting
+  for an answer to a question (`question` tool) - both gated on the away switch.
 - Exposes a `notify_email` tool so the agent can email you on purpose.
 - Does **not** receive replies or act on them: email is one-way by design.
   Remote approval lives in the [QQ project](https://github.com/FireChickenMP4/opencode-notify-qq).
@@ -84,5 +86,7 @@ a long task finishes.
 - A failed send is retried (1s / 3s); if it still fails, the message is appended
   to `notify-email.undelivered.log` next to the plugin so nothing is lost
   silently.
-- The plugin file exports only `NotifyEmailPlugin`; opencode calls **every** named
-  export of a `plugins/*.ts` file as a plugin, so helpers live in `src/`.
+- Helpers live in `src/`; the plugin file default-exports the V2 definition.
+- Editing anything under `src/` needs an opencode **service restart** to take
+  effect: opencode hot-reloads the plugin file itself, but its imported modules
+  stay cached in the running process.
