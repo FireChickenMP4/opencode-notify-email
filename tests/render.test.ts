@@ -26,6 +26,13 @@ describe("renderMarkdown", () => {
     expect(out).toContain("npm run build");
   });
 
+  test("fenced code gets inline syntax colors and a dark panel", () => {
+    const out = renderMarkdown("```js\nconst x = 1;\n```");
+    expect(out).toContain("background:#1e1e2e");
+    expect(out).toContain("color:#cba6f7");
+    expect(out).toContain("color:#fab387");
+  });
+
   test("inline code is styled and distinct from block code", () => {
     const out = renderMarkdown("use `npm ci` now");
     expect(out).toContain("<code style=");

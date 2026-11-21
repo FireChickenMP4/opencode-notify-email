@@ -37,7 +37,7 @@ Copy-Item (Join-Path $repo "src\notify-email.ps1") (Join-Path $srcDir "notify-em
 # Runtime deps must be resolvable from the installed plugin; they are not bundled.
 # Note: install one at a time. `npm install @missing` with an array splats each
 # element as a separate arg AND can split single-char names, installing junk.
-$deps = @("nodemailer", "marked")
+$deps = @("nodemailer", "marked", "highlight.js", "marked-highlight")
 foreach ($dep in $deps) {
     if (-not (Test-Path (Join-Path $configDir "node_modules\$dep"))) {
         Write-Output "installing missing dep into the global config: $dep..."
@@ -91,3 +91,4 @@ if (Test-Path $cfg) {
 
 Write-Output ""
 Write-Output "installed. Restart opencode, then the agent has the notify_email tool."
+
